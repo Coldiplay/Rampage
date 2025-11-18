@@ -26,9 +26,22 @@ namespace Rampage
                 await client.SendAsync("PickAction", new RoomAction { RoomId = currentRoomName, ActionType = action});
             });
 
+            client.On<List<string>>("PastRoundInfo", (actions) =>
+            {
+                foreach (string action in actions)
+                {
+                    Console.WriteLine(action);
+                }
+            });
+
             //Конец игры
             client.On("EndGame", () =>
             {
+                game = false;
+            });
+            client.On("", () =>
+            {
+                Console.WriteLine("asdasd");
                 game = false;
             });
 
