@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
 using Rampage.Model;
-using System.Threading.Tasks;
 
 namespace Rampage
 {
@@ -8,9 +7,9 @@ namespace Rampage
     {
 
         private static readonly HubConnection client = new HubConnectionBuilder().WithUrl("").WithAutomaticReconnect().Build();
-        private static readonly Player currentPlayer = new();
+        private static Player currentPlayer = new();
         private static Room currentRoom = new();
-        private static string currentRoomName;
+        private static int round = 1;
         static async Task Main(string[] args)
         {
             bool game = true;
@@ -21,11 +20,30 @@ namespace Rampage
             //При начале раунда/хода
             client.On<Room>("StartRound", async (room) =>
             {
+                Console.WriteLine($"Раунд {round++}");
                 currentRoom = room;
-                int action = await ChooseAction();
-                await client.SendAsync("PickAction", new RoomAction { RoomId = currentRoomName, ActionType = action});
+
+                GetInfoRoom(currentRoom);
+                room.PlayerState.TryGetValue(currentPlayer.Name, out var player);
+                if (player is null)
+                {
+                    currentPlayer.HP = 0;
+                    return;
+                }
+
+                currentPlayer = player;
+                RoomAction action = new()
+                {
+                    Actor = currentPlayer.Name,
+                    GroupId = room.Number,
+                    ActionType = ChooseAction(),
+                    Target = ChooseTarget(room).Name
+                };
+
+                await client.SendAsync("PickAction", action);
             });
 
+            //Что произошло за ход
             client.On<List<string>>("PastRoundInfo", (actions) =>
             {
                 foreach (string action in actions)
@@ -35,23 +53,16 @@ namespace Rampage
             });
 
             //Конец игры
-            client.On("EndGame", () =>
+            client.On<Player>("Winner", player =>
             {
+                Console.WriteLine($"Конец игры. Победитель - {player.Name} c {player.HP} HP");
                 game = false;
             });
-            client.On("", () =>
-            {
-                Console.WriteLine("asdasd");
-                game = false;
-            });
-
-
 
             while (game)
             {
                 Console.ReadLine();
             }
-            //Console.WriteLine("Hello, World!");
         }
 
         private static async Task<bool> JoinGame()
@@ -65,17 +76,40 @@ namespace Rampage
                 Console.WriteLine("Не удалось подключиться, попробуйте снова\n");
                 return false;
             }
-            currentRoomName = result;
+            currentRoom.Number = result;
             //currentRoom.Number = result;
-            return true; ;
+            return true;
         }
-        private static async Task<int> ChooseAction()
+        private static int ChooseAction()
         {
-
-
-            return 0;
+            Console.WriteLine("Выберите действие:\n1 - Атака\n2 - Защита");
+            int action;
+            while (!int.TryParse(GetUserInput(), out action) || action < 1 || action > 2)
+            {
+                Console.WriteLine("Введите ноиер действия.");
+            }
+            return action;
         }
-
+        private static Player ChooseTarget(Room room)
+        {
+            Console.WriteLine("Выберите цель:");
+            int targetsCount = GetInfoRoom(room);
+            int idTarget;
+            while (!int.TryParse(GetUserInput(), out idTarget) || idTarget < 1 || idTarget > targetsCount || room.PlayerState.ElementAtOrDefault(idTarget).Value is not null  || room.PlayerState.ElementAt(idTarget).Value != currentPlayer)
+            {
+                Console.WriteLine("Неверная цель, попробуйте снова");
+            }
+            return room.PlayerState.ElementAt(idTarget).Value;
+        }
+        private static int GetInfoRoom(Room room)
+        {
+            for (int i = 0; i < room.PlayerState.Count; i++)
+            {
+                var player = room.PlayerState.ElementAt(i).Value;
+                Console.WriteLine($"{i + 1} {player.Name} - {player.HP} HP");
+            }
+            return room.PlayerState.Count;
+        }
         private static string GetUserInput()
         {
             string input = Console.ReadLine();
