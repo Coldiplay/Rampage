@@ -6,32 +6,71 @@ namespace Rampage
     internal class Program
     {
 
-        private static readonly HubConnection client = new HubConnectionBuilder().WithUrl("").WithAutomaticReconnect().Build();
+        private static readonly HubConnection client = new HubConnectionBuilder().WithUrl($"{Config.ServerName}/game").WithAutomaticReconnect().Build();
         private static Player currentPlayer = new();
         private static Room currentRoom = new();
         private static int round = 1;
+        private static bool game = false;
+        private static int state = 1;
         static async Task Main(string[] args)
         {
-            bool game = true;
+            game = true;
+            await client.StartAsync();
+            await Initialize();
             while (!await JoinGame())
             {
             }
 
+            while (game)
+            {
+                switch (state)
+                {
+                    case 1:
+
+                        break;
+
+
+                    
+                }
+            }
+            //while (game)
+            //{
+            //    Console.ReadLine();
+            //}
+        }
+
+        private static async Task<bool> JoinGame()
+        {
+            Console.WriteLine("Введите имя");
+            bool result;
+            currentPlayer.Name = GetUserInput();
+            result = await client.InvokeAsync<bool>("Registration", currentPlayer.Name);
+            if (!result)
+            {
+                Console.WriteLine("Не удалось подключиться, попробуйте снова\n");
+                return false;
+            }
+            //currentRoom.Number = result;
+            return true;
+        }
+        private static async Task Initialize()
+        {
             //При начале раунда/хода
             client.On<Room>("StartRound", async (room) =>
             {
                 Console.WriteLine($"Раунд {round++}");
                 currentRoom = room;
-
-                GetInfoRoom(currentRoom);
+                
                 room.PlayerState.TryGetValue(currentPlayer.Name, out var player);
                 if (player is null)
                 {
                     currentPlayer.HP = 0;
                     return;
                 }
-
                 currentPlayer = player;
+                state = 1;
+                //
+                GetInfoRoom(currentRoom);
                 RoomAction action = new()
                 {
                     Actor = currentPlayer.Name,
@@ -58,27 +97,6 @@ namespace Rampage
                 Console.WriteLine($"Конец игры. Победитель - {player.Name} c {player.HP} HP");
                 game = false;
             });
-
-            while (game)
-            {
-                Console.ReadLine();
-            }
-        }
-
-        private static async Task<bool> JoinGame()
-        {
-            Console.WriteLine("Введите имя");
-            string result;
-            currentPlayer.Name = GetUserInput();
-            result = await client.InvokeAsync<string>("Registration", currentPlayer.Name);
-            if (result == "fail")
-            {
-                Console.WriteLine("Не удалось подключиться, попробуйте снова\n");
-                return false;
-            }
-            currentRoom.Number = result;
-            //currentRoom.Number = result;
-            return true;
         }
         private static int ChooseAction()
         {

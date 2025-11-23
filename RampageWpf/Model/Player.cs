@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Rampage.Model
+namespace RampageWpf.Model
 {
     public class Player
     {
